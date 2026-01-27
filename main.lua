@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 -- / Types \ --
 export type BW = {
 	send: (Buff: buffer, Remote: string) -> (),
+	getPacketId: (NameSpace: string, PacketName: string) -> (number | nil),
 	string: (PacketId: number, Str: string) -> (buffer | nil),
 	u8: (PacketId: number, Value: number) -> (buffer | nil),
 }
@@ -28,11 +29,13 @@ local ByteNetStorage = ReplicatedStorage:WaitForChild("BytenetStorage")
 local Reliable = ReplicatedStorage:WaitForChild("ByteNetReliable")
 local Unreliable = ReplicatedStorage:WaitForChild("ByteNetUnreliable")
 
+local StoredNamespaces = {}
+-- To save expensive HttpService:JSONDecode()s
+
 local BufferWriter = {} :: BW
 -- \           / --
 
 -- / Functionality \ --
-
 local function CheckLimits(BitSize: number, Signed: boolean, Value: number): (boolean, string)
 	local LowerLimit, HigherLimit = 0, 0
 	if Signed then
@@ -57,7 +60,9 @@ end
 
 -- Limitations:  0-255   (8-bit Unsigned Integer)
 function BufferWriter.u8(PacketId: number, Value: number): buffer | nil
-	local Check, Err = CheckLimits(1, false, Value)
+	if PacketId == nil then return nil end
+	
+	local Check, Err = CheckLimits(8, false, Value)
 	if not Check then warn(Err) return nil end
 	
 	local Buff = buffer.create(3)
@@ -77,9 +82,11 @@ end
 
 -- String Character Limitations:  0-65535  (16-bit Unsigned Integer)
 function BufferWriter.string(PacketId: number, Str: string): buffer | nil
+	if PacketId == nil then return nil end
+	
 	local StringLength = #Str
 	
-	local Check, Err = CheckLimits(2, false, StringLength)
+	local Check, Err = CheckLimits(16, false, StringLength)
 	if not Check then warn(Err) return nil end
 
 	local Buff = buffer.create(StringLength + 4)
@@ -113,6 +120,29 @@ function BufferWriter.send(Buff: buffer, Remote: string)
 	
 	RemoteEvent:FireServer(Buff, nil)
 	-- Sending the buffer, then the references which aren't fully added in the version that this module supports.
+end
+
+-- Expects types to be correct
+function BufferWriter.getPacketId(NameSpace: string, PacketName: string): number | nil
+	if not NameSpace or not PacketName then return nil end
+	
+	local FoundNamespace = StoredNamespaces[NameSpace]
+	
+	local StorageNamespace: Instance? = ByteNetStorage:FindFirstChild(NameSpace)
+	
+	if not FoundNamespace and not StorageNamespace then
+		warn(`[BufferWriter.getPacketId]: ⚠️ couldn't find namespace '{NameSpace}'!`)
+		return nil
+	elseif not FoundNamespace then
+		local Decoded = HttpService:JSONDecode(StorageNamespace.Value)
+		StoredNamespaces[NameSpace] = Decoded
+		FoundNamespace = Decoded
+	end
+	local PacketId = FoundNamespace.packets[PacketName]
+	if PacketId then return PacketId end
+	
+	warn(`[BufferWriter.getPacketId]: ⚠️ Couldn't get the id of search: packet '{PacketName}'' inside of name '{NameSpace}'!`)
+	return nil
 end
 
 return BufferWriter
