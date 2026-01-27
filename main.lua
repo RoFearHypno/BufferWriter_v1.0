@@ -88,8 +88,8 @@ function BufferWriter.u16(PacketId: number, Value: number): buffer | nil
 	local Check, Err = CheckLimits(16, false, Value)
 	if not Check then warn(Err) return nil end
 
-	local Buff = buffer.create(3)
-	--flag + id + value  (1 each)
+	local Buff = buffer.create(4)
+	--flag + id + (2)value  (1 each)
 
 	local Cursor = 0
 	buffer.writeu8(Buff, Cursor, 1)
