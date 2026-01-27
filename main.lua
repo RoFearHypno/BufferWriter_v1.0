@@ -21,6 +21,7 @@ export type BW = {
 	getPacketId: (NameSpace: string, PacketName: string) -> (number | nil),
 	string: (PacketId: number, Str: string) -> (buffer | nil),
 	u8: (PacketId: number, Value: number) -> (buffer | nil),
+	u16: (PacketId: number, Value: number) -> (buffer | nil),
 }
 -- \       / --
 
@@ -76,6 +77,28 @@ function BufferWriter.u8(PacketId: number, Value: number): buffer | nil
 	Cursor += 1
 
 	buffer.writeu8(Buff, Cursor, Value)
+
+	return Buff
+end
+
+-- Limitations:  0-65535   (16-bit Unsigned Integer)
+function BufferWriter.u16(PacketId: number, Value: number): buffer | nil
+	if PacketId == nil then return nil end
+
+	local Check, Err = CheckLimits(16, false, Value)
+	if not Check then warn(Err) return nil end
+
+	local Buff = buffer.create(3)
+	--flag + id + value  (1 each)
+
+	local Cursor = 0
+	buffer.writeu8(Buff, Cursor, 1)
+	Cursor += 1
+
+	buffer.writeu8(Buff, Cursor, PacketId)
+	Cursor += 1
+
+	buffer.writeu16(Buff, Cursor, Value)
 
 	return Buff
 end
