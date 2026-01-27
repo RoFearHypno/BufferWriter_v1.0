@@ -141,7 +141,7 @@ function BufferWriter.getPacketId(NameSpace: string, PacketName: string): number
 	local PacketId = FoundNamespace.packets[PacketName]
 	if PacketId then return PacketId end
 	
-	warn(`[BufferWriter.getPacketId]: ⚠️ Couldn't get the id of search: packet '{PacketName}'' inside of name '{NameSpace}'!`)
+	warn(`[BufferWriter.getPacketId]: ⚠️ Couldn't get the id of search: packet '{PacketName}' inside of namespace '{NameSpace}'!`)
 	return nil
 end
 
