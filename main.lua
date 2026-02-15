@@ -175,7 +175,9 @@ function BufferWriter.send(Buff: buffer, Remote: string)
 	
 	local RemoteEvent = Remote == "Reliable" and Reliable or Remote == "Unreliable" and Unreliable
 	if RemoteEvent == nil then warn("[BufferWriter.send]: ⚠️ Remote arg was provided, but isn't a valid remote type!") return end
-	
+
+	warn(RemoteEvent.Name)
+			
 	RemoteEvent:FireServer(Buff, nil)
 	-- Sending the buffer, then the references which aren't fully added in the version that this module supports.
 end
