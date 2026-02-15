@@ -11,6 +11,9 @@
 -- This script does trust PacketId's, so be careful. (Meaning expecting 0-255 and not checking)
 -- SCRIPT NO LONGER TRUSTS PACKETIDS
 
+-- What's new?:
+-- ADDED OPTIONAL FLAG FOR INTERNAL FUNCTION
+
 -- / Services \ --
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -30,8 +33,8 @@ export type BW = {
 
 -- / Variables \ --
 local ByteNetStorage = ReplicatedStorage:WaitForChild("BytenetStorage")
-local Reliable = ReplicatedStorage:WaitForChild("ByteNetReliable")
-local Unreliable = ReplicatedStorage:WaitForChild("ByteNetUnreliable")
+local Reliable: RemoteEvent = ReplicatedStorage:WaitForChild("ByteNetReliable") :: RemoteEvent
+local Unreliable: RemoteEvent = ReplicatedStorage:WaitForChild("ByteNetUnreliable") :: RemoteEvent
 
 local StoredNamespaces = {}
 -- To save expensive HttpService:JSONDecode()s
@@ -63,8 +66,12 @@ local function CheckLimits(BitSize: number, Signed: boolean, Value: number): (bo
 end
 
 -- Local function the type checks the PacketId and CallerName and then returns a buffer with the flag and packet id
--- Limitation: 0-255 Packet ID | CallerName: 0-(64b limit)
-local function WriteFlagAndPacketId(PacketId: number, CallerName: string, Size: number) : (buffer | nil)
+-- Limitation: 0-255 Packet ID | 0-255 Flag ID | CallerName: 0-(64b limit)
+local function WriteFlagAndPacketId(PacketId: number, CallerName: string, Size: number, Flag: number?) : (buffer | nil)
+	if (Flag and type(Flag) and Flag > 255) or not Flag or typeof(Flag) ~= "number" then 
+		Flag = 0
+	end
+	
 	assert(CallerName, "[ByteWriter.WriteFlagAndPacketId(lf)]: ⚠️ CallerName arg wasn't provided or resulted to nil!")
 	assert(typeof(CallerName) == "string", "[ByteWriter.WriteFlagAndPacketId(lf)]: ⚠️ CallerName arg wasn't nil, but isn't type 'string'!")
 	
@@ -77,7 +84,7 @@ local function WriteFlagAndPacketId(PacketId: number, CallerName: string, Size: 
 	if PacketId < 0 or PacketId > 255 then return nil end
 	
 	local Buff = buffer.create(Size)
-	buffer.writeu8(Buff, 0, 1)
+	buffer.writeu8(Buff, 0, Flag :: number)
 	buffer.writeu8(Buff, 1, PacketId)
 	-- [Flag] [PacketId]
 	
@@ -173,11 +180,11 @@ function BufferWriter.send(Buff: buffer, Remote: string)
 	if Buff == nil then warn("[BufferWriter.send]: ⚠️ Buff arg is nil or resulted to nil!") return end
 	if typeof(Buff) ~= "buffer" then warn("[BufferWriter.send]: ⚠️ Buff arg isn't nil, but isn't type 'buffer'!") return end
 	
-	local RemoteEvent = Remote == "Reliable" and Reliable or Remote == "Unreliable" and Unreliable
-	if RemoteEvent == nil then warn("[BufferWriter.send]: ⚠️ Remote arg was provided, but isn't a valid remote type!") return end
-
+	local RemoteEvent: RemoteEvent | false = Remote == "Reliable" and Reliable or Remote == "Unreliable" and Unreliable
+	if RemoteEvent == false then warn("[BufferWriter.send]: ⚠️ Remote arg was provided, but isn't a valid remote type!") return end
+	
 	warn(RemoteEvent.Name)
-			
+	
 	RemoteEvent:FireServer(Buff, nil)
 	-- Sending the buffer, then the references which aren't fully added in the version that this module supports.
 end
@@ -193,8 +200,8 @@ function BufferWriter.getPacketId(NameSpace: string, PacketName: string): number
 	if not FoundNamespace and not StorageNamespace then
 		warn(`[BufferWriter.getPacketId]: ⚠️ couldn't find namespace '{NameSpace}'!`)
 		return nil
-	elseif not FoundNamespace then
-		local Decoded = HttpService:JSONDecode(StorageNamespace.Value)
+	elseif not FoundNamespace and StorageNamespace and StorageNamespace:IsA("StringValue") then
+		local Decoded = HttpService:JSONDecode(StorageNamespace.Value::string)
 		StoredNamespaces[NameSpace] = Decoded
 		FoundNamespace = Decoded
 	end
