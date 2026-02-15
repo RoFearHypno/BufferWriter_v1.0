@@ -13,6 +13,7 @@
 
 -- What's new?:
 -- ADDED OPTIONAL FLAG FOR INTERNAL FUNCTION
+-- ADDED A NEW GETPACKETNAMEBYID FUNCTION
 
 -- / Services \ --
 local HttpService = game:GetService("HttpService")
@@ -23,6 +24,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 export type BW = {
 	send: (Buff: buffer, Remote: string) -> (),
 	getPacketId: (NameSpace: string, PacketName: string) -> (number | nil),
+	getPacketNameById: (NameSpace: string, PacketId: number) -> (string | nil),
 	string: (PacketId: number, Str: string) -> (buffer | nil),
 	u8: (PacketId: number, Value: number) -> (buffer | nil),
 	u16: (PacketId: number, Value: number) -> (buffer | nil),
@@ -209,6 +211,32 @@ function BufferWriter.getPacketId(NameSpace: string, PacketName: string): number
 	if PacketId then return PacketId end
 	
 	warn(`[BufferWriter.getPacketId]: ⚠️ Couldn't get the id of search: packet '{PacketName}' inside of namespace '{NameSpace}'!`)
+	return nil
+end
+
+-- Expects types to be correct
+function BufferWriter.getPacketNameById(NameSpace: string, PacketId: number): string | nil
+	if not NameSpace or not PacketId then return nil end
+
+	local FoundNamespace = StoredNamespaces[NameSpace]
+
+	local StorageNamespace: Instance? = ByteNetStorage:FindFirstChild(NameSpace)
+
+	if not FoundNamespace and not StorageNamespace then
+		warn(`[BufferWriter.getPacketId]: ⚠️ couldn't find namespace '{NameSpace}'!`)
+		return nil
+	elseif not FoundNamespace and StorageNamespace and StorageNamespace:IsA("StringValue") then
+		local Decoded = HttpService:JSONDecode(StorageNamespace.Value::string)
+		StoredNamespaces[NameSpace] = Decoded
+		FoundNamespace = Decoded
+	end
+	for PacketName, PId in next, FoundNamespace.packets do
+		if PId == PacketId then
+			return PacketName
+		end
+	end
+
+	warn(`[BufferWriter.getPacketId]: ⚠️ Couldn't find the name of the packet for id '{tostring(PacketId)}' inside of namespace '{NameSpace}'!`)
 	return nil
 end
 
